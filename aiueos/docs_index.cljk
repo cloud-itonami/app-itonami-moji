@@ -1,0 +1,68 @@
+(ns docs.index
+  "文書 index 判定コア — itonami dapp bundle（pure, :effects #{}）。
+
+  構造文書ボディのグローバル character index の判定
+  （正本: lg-clj/src/lg_docs/docbody.cljk — Google Docs の index 対応）:
+
+  - 各要素は text の長さぶんの index 位置と **1 つの改行セパレータ**を
+    貢献する。endIndex = start + len、次の startIndex = start + len + 1。
+  - index-to-pos はグローバル index を [要素 offset] に写し、**文書末に
+    クランプ**する（負の local offset は 0）。
+  - 要素をまたぐ deleteRange は部分要素を merge し、**start 側の kind が勝つ**。
+
+  span-end: endIndex = start + len
+  next-start: 次の要素の startIndex = start + len + 1（改行 1 ぶん）
+  clamp-offset: local offset = max(0, index - pos)
+  in-span: 1 = その要素の範囲内（index <= pos + len）
+  merge-kind-wins: start 側の kind を返す（merge 規則）
+
+  実行 host はスカラーのみ = KIR v3 / i64/direct ABI（kernel/selfhost 両対応）。
+
+  テストはゼロ引数 test-*、戻り 1/0:
+  <amu> test aiueos/docs_index.cljk"
+  (:export [main span-end next-start clamp-offset in-span merge-kind-wins
+            test-span test-next test-clamp test-in-span test-merge test-fail-closed]))
+
+(defn main [] :i64
+  0)
+
+(defn span-end [start :i64 len :i64] :i64
+  (+ start len))
+
+(defn next-start [start :i64 len :i64] :i64
+  (+ start len 1))
+
+(defn clamp-offset [index :i64 pos :i64] :i64
+  (if (< index pos) 0 (- index pos)))
+
+(defn in-span [index :i64 pos :i64 len :i64] :i64
+  (if (<= index (+ pos len)) 1 0))
+
+(defn merge-kind-wins [start-kind :i64 end-kind :i64] :i64
+  start-kind)
+
+;; --- tests（戻り 1 = pass） ------------------------------------------------
+
+(defn test-span [] :i64
+  ;; endIndex = start + len
+  (if (= (+ (span-end 0 5) (span-end 10 3)) 18) 1 0))
+
+(defn test-next [] :i64
+  ;; 改行 1 ぶんのセパレータ
+  (if (= (+ (next-start 0 5) (next-start 6 3)) 16) 1 0))
+
+(defn test-clamp [] :i64
+  ;; 0 未満の local offset は 0（文書末クランプ）
+  (if (= (+ (clamp-offset 7 5) (clamp-offset 3 5)) 2) 1 0))
+
+(defn test-in-span [] :i64
+  ;; index <= pos + len で範囲内
+  (if (= (+ (in-span 5 0 5) (in-span 6 0 5) (in-span 0 5 3)) 2) 1 0))
+
+(defn test-merge [] :i64
+  ;; 要素をまたぐ delete の merge は start 側の kind が勝つ
+  (if (= (+ (merge-kind-wins 1 2) (merge-kind-wins 3 0)) 4) 1 0))
+
+(defn test-fail-closed [] :i64
+  ;; 規則の合成: start 0 len 5 → end 5 → next 6。途中の index はこの要素内
+  (if (= (+ (span-end 0 5) (next-start 0 5) (in-span 3 0 5) (clamp-offset 3 0)) 15) 1 0))
