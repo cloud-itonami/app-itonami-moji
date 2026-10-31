@@ -1,5 +1,5 @@
 (ns lg-docs.index-parity-test
-  "aiueos/docs_index.cljk（判定コア）と lg-docs.docbody の parity。実関数
+  "aiueos/docs_index.kotoba（判定コア）と lg-docs.docbody の parity。実関数
   with-indices / index-to-pos / apply-request が guest の判定と一致する。"
   (:require [clojure.test :refer [deftest is testing]]
             [lg-docs.docbody :as d]))

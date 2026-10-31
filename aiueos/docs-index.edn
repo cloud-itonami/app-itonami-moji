@@ -1,10 +1,10 @@
 ;; app-docs — itonami（dapp）の aiueos アプリ記述子（notes.edn 形）。
-;; 判定コアは aiueos/docs_index.cljk（グローバル index・merge 規則）。
+;; 判定コアは aiueos/docs_index.kotoba（グローバル index・merge 規則）。
 ;; 正本は lg-clj/src/lg_docs/docbody.cljk（Google Docs index 対応）。pure（:effects #{}）。
 {:aiueos/component :app/docs-index
  :aiueos/kind :app
  :aiueos/trust :untrusted
- :aiueos/source "docs_index.cljk"
+ :aiueos/source "docs_index.kotoba"
  :aiueos/wasm "docs_index.wasm"
  :aiueos/entry "main"
  :aiueos/args []
