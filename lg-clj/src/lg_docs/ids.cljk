@@ -2,13 +2,13 @@
   "Identity helpers for documents — clj/bb port of lg_docs/ids.py.
 
   Canonical entity id = `doc:doc:{slug}` (the datomic entity ref).
-  Path-based DID    = `did:web:docs.etzhayyim.com:document:{slug}`.
-  AT URI            = `at://{did}/ai.etzhayyim.apps.docs.document/{slug}`."
+  Path-based DID    = `did:web:moji.itonami.app:document:{slug}`.
+  AT URI            = `at://{did}/app.itonami.moji.document/{slug}`."
   (:require [kotoba.lang.text :as str]))
 
 (def ^:private slug-alphabet "0123456789abcdefghijklmnopqrstuvwxyz")
-(def ^:private domain "docs.etzhayyim.com")
-(def ^:private collection "ai.etzhayyim.apps.docs.document")
+(def ^:private domain "moji.itonami.app")
+(def ^:private collection "app.itonami.moji.document")
 
 (defn- rand-str [n alphabet]
   (apply str (repeatedly n #(rand-nth alphabet))))

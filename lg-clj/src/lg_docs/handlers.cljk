@@ -1,5 +1,5 @@
 (ns lg-docs.handlers
-  "Canonical docs method handlers (ai.etzhayyim.apps.docs.*) — clj/bb port of
+  "Canonical docs method handlers (app.itonami.moji.*) — clj/bb port of
   lg_docs/handlers.py.
 
   Storage-agnostic (takes a lg-docs.store/DocStore). The docs-compat worker

@@ -3,9 +3,9 @@
 
   Routes (canonical XRPC over kotoba datomic, graph `docs-v1`):
     GET  /health /ok
-    GET  /xrpc/ai.etzhayyim.apps.docs.documentsGet
-    POST /xrpc/ai.etzhayyim.apps.docs.documentsCreate
-    POST /xrpc/ai.etzhayyim.apps.docs.documentsBatchUpdate
+    GET  /xrpc/app.itonami.moji.documentsGet
+    POST /xrpc/app.itonami.moji.documentsCreate
+    POST /xrpc/app.itonami.moji.documentsBatchUpdate
 
   `handle-request` is a pure ring-ish dispatcher (method/path/headers/query/body
   -> {:status :body}) so the routing + x-api-key auth are deterministically
@@ -45,17 +45,17 @@
       (and (= :get method) (#{"/health" "/ok"} path))
       {:status 200 :body {:ok true :app "lg-docs" :ts (now-ms)}}
 
-      (and (= :post method) (= path "/xrpc/ai.etzhayyim.apps.docs.documentsCreate"))
+      (and (= :post method) (= path "/xrpc/app.itonami.moji.documentsCreate"))
       (if-not (auth-ok? headers)
         {:status 401 :body {:detail "x-api-key mismatch"}}
         {:status 200 :body (handlers/documents-create st body)})
 
-      (and (= :post method) (= path "/xrpc/ai.etzhayyim.apps.docs.documentsBatchUpdate"))
+      (and (= :post method) (= path "/xrpc/app.itonami.moji.documentsBatchUpdate"))
       (if-not (auth-ok? headers)
         {:status 401 :body {:detail "x-api-key mismatch"}}
         {:status 200 :body (handlers/documents-batch-update st body)})
 
-      (and (= :get method) (= path "/xrpc/ai.etzhayyim.apps.docs.documentsGet"))
+      (and (= :get method) (= path "/xrpc/app.itonami.moji.documentsGet"))
       (if-not (auth-ok? headers)
         {:status 401 :body {:detail "x-api-key mismatch"}}
         {:status 200 :body (handlers/documents-get st query)})

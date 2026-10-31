@@ -6,7 +6,7 @@
 ## 位置づけ
 
 app-docs は **Google Docs v1（structural）と MS Word（plaintext）の両方に互換な
-文書 API**（docs.etzhayyim.com、canonical は kotoba datomic `docs-v1`）。
+文書 API**（moji.itonami.app、canonical は kotoba datomic `docs-v1`）。
 workspace-compat の第 4（最終）垂直。本スライスは **文書ボディの
 グローバル character index の判定**（`docbody.cljk` — Google Docs の
 index 対応）を判定コア化。
