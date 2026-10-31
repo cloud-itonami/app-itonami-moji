@@ -8,6 +8,7 @@
   Check: same, with --check (exit 1 if the committed file is stale)"
   (:require ["node:fs" :as fs]
             ["node:process" :as process]
+            [clojure.string :as str]
             [jp-go-dds.page :as dds-page]))
 
 (def dds-root
@@ -27,15 +28,23 @@
 
 (def out-path "public/index.html")
 
+(def csp-meta
+  "connect-src derived from public/client-runtime.json by the canonical broker
+  (`clientRuntimeConnectSrc`); no declared operations gives 'none'.
+  scripts/check-client-runtime.mjs fails when the two drift apart."
+  "<meta http-equiv=\"Content-Security-Policy\" content=\"connect-src 'none'\">")
+
 (defn page []
-  (dds-page/->page
+  (str/replace-first
+   (dds-page/->page
    {:title "docs-performers-r5ycqp6x"
     :description "Docs Performers — AI Agent (reagent + re-frame + jp-go-dds)."
     :lang "ja"
     :css dds-css}
    [:div {:id "app"} "docs-performers-r5ycqp6x loading…"]
    [:noscript "This app requires JavaScript."]
-   [:script {:src "js/app.js"}]))
+   [:script {:src "js/app.js"}])
+   "<head>" (str "<head>" csp-meta)))
 
 (defn -main [& args]
   (let [check? (some #{"--check"} args)
