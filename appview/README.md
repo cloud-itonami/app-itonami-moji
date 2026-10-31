@@ -1,4 +1,4 @@
-# etzhayyim-project-docs App migration
+# itonami Moji（文字）App migration（旧 etzhayyim-project-docs）
 
 このディレクトリは `legacy-runtime` 実装を残したまま、App 版を段階移行するための配置先です。
 
