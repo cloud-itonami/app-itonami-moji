@@ -15,11 +15,11 @@ index 対応）を判定コア化。
 
 | 層 | 実体 | 状態 |
 |---|---|---|
-| 判定コア guest | `aiueos/docs_index.cljk` — span-end（endIndex = start+len）/ next-start（**改行 1 ぶんのセパレータ**: 次の start = start+len+1）/ clamp-offset（local offset は 0 未満にならない = 末尾クランプ）/ in-span / merge-kind-wins（**要素をまたぐ delete の merge は start 側の kind が勝つ**） | **実装済み・実測** |
+| 判定コア guest | `aiueos/docs_index.kotoba` — span-end（endIndex = start+len）/ next-start（**改行 1 ぶんのセパレータ**: 次の start = start+len+1）/ clamp-offset（local offset は 0 未満にならない = 末尾クランプ）/ in-span / merge-kind-wins（**要素をまたぐ delete の merge は start 側の kind が勝つ**） | **実装済み・実測** |
 | 記述子 | `aiueos/docs-index.edn` | **実装済み** |
 | parity | `test-shims/lg_docs/index_parity_test.cljc` — **実物の docbody を bb で実行**（with-indices / index-to-pos / apply-request）して一致 | **実装済み・実測** |
 
-実測: `amu test aiueos/docs_index.cljk` → **18/18**（jvm-kir / js / wasm）。
+実測: `amu test aiueos/docs_index.kotoba` → **18/18**（jvm-kir / js / wasm）。
 parity → 2 tests / 6 assertions / 0 failures（bb 実行）。
 
 ## 正本の正確な規則（guest はこれに追従）

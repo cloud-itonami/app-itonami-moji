@@ -1,0 +1,401 @@
+(ns moji.editor
+  ;; itonami Moji（文字）— a document editor written only in Kotoba.
+  ;;
+  ;; The three app exports are the contract `kotoba-lang/amu`'s
+  ;; `runtime/dom-driver.mjs` drives (the same shape as `examples/todo-app`):
+  ;;
+  ;;   init  ()                              -> state
+  ;;   view  (state)                         -> UI :document
+  ;;   step  (state, target, kind, value)    -> next state
+  ;;
+  ;; All three are pure: no DOM name, no host object, no callback, no
+  ;; capability. A node says who it is with `:data-k`; the host tells us which
+  ;; name was acted on. Saving the state between sessions is the host's job
+  ;; (client-runtime local-state `itonami.moji.state.v1`), not this module's.
+  ;;
+  ;; The document is an ordered list of blocks -- "h1" "h2" "p" "li" -- the
+  ;; heading/paragraph/list subset of `kotoba-lang/docs`. Each block carries
+  ;; the Google Docs body index the judgment core `aiueos/docs_index` decides:
+  ;; the body starts at 1, a block spans its text length, and one newline
+  ;; separates it from the next (span-end / next-start below are that core's
+  ;; definitions, unchanged, so their definition CIDs are the same).
+  ;;
+  ;; Bounds that are real today, not promises:
+  ;;   * at most 32 blocks -- a `:document` vector holds 32 items
+  ;;     (`document-container-item-limit`);
+  ;;   * lengths are UTF-8 bytes (`string-byte-length`); Google Docs counts
+  ;;     UTF-16 code units, so the shown index matches it only for ASCII text;
+  ;;   * one event value is at most 1 KiB (the driver's MAX_VALUE_BYTES);
+  ;;   * block kinds ("h1" "h2" "p" "li") and the mode ("edit" "preview") are
+  ;;     strings, not keywords: on the native Amu CLI, reading a keyword back
+  ;;     out of a :document (`document-keyword-value`) crashes the program
+  ;;     (exit 139, measured 2026-10-31), and strings behave the same on every
+  ;;     route.
+  ;;
+  ;; `main` and the `test-*` functions are the module's own checks: `main`
+  ;; returns how many of them pass (`amu run` prints 13 when all do).
+  (:export [init view step main
+            test-index-core test-indices test-add test-add-limit test-input
+            test-title test-kind test-move-down test-move-up test-remove
+            test-mode test-unknown test-view]))
+
+;; --- judgment core (aiueos/docs_index, unchanged) -------------------------
+
+(defn span-end [start :i64 len :i64] :i64
+  (+ start len))
+
+(defn next-start [start :i64 len :i64] :i64
+  (+ start len 1))
+
+;; --- document accessors ---------------------------------------------------
+
+(defn dget [d :document k :keyword] :document
+  (option-value-of [:option :document] (document-get d k) (document-null)))
+
+(defn dstr [d :document] :string
+  (option-value-of [:option :string] (document-string-value d) ""))
+
+
+(defn dat [v :document i :i64] :document
+  (option-value-of [:option :document] (document-vector-at v i) (document-null)))
+
+(defn blocks [state :document] :document
+  (dget state :blocks))
+
+(defn block-count [state :document] :i64
+  (document-count (blocks state)))
+
+(defn block-text [state :document i :i64] :string
+  (dstr (dget (dat (blocks state) i) :text)))
+
+(defn block-kind [state :document i :i64] :string
+  (dstr (dget (dat (blocks state) i) :kind)))
+
+(defn block [kind :string text :string] :document
+  (document-map :kind (document-string kind)
+                :text (document-string text)))
+
+;; --- element builders -----------------------------------------------------
+
+(defn el [tag :string attrs :document children :document] :document
+  (document-map :tag (document-string tag)
+                :attrs attrs
+                :children children))
+
+(defn leaf [tag :string attrs :document text :string] :document
+  (document-map :tag (document-string tag)
+                :attrs attrs
+                :text (document-string text)))
+
+(defn button [k :string class :string label :string] :document
+  (leaf "button"
+        (document-map :data-k (document-string k)
+                      :type (document-string "button")
+                      :class (document-string class))
+        label))
+
+;; --- nominal block identity -----------------------------------------------
+
+(defn key-at [i :i64] :string
+  (string-from-i64 i))
+
+;; There is no `i64-from-string`, so a key is found by scanning; the scan is
+;; bounded by the block count, not by a constant.
+(defn key-index-from [k :string i :i64 n :i64] :i64
+  (cond
+    (>= i n) -1
+    (string=? (key-at i) k) i
+    :else (key-index-from k (+ i 1) n)))
+
+(defn key-index [k :string n :i64] :i64
+  (key-index-from k 0 n))
+
+;; --- body index -----------------------------------------------------------
+
+;; startIndex of block i: 1 for the first block, then next-start of the one
+;; before it.
+(defn start-index-from [state :document i :i64 at :i64 start :i64] :i64
+  (if (>= at i)
+    start
+    (start-index-from state i (+ at 1)
+                      (next-start start (string-byte-length (block-text state at))))))
+
+(defn start-index [state :document i :i64] :i64
+  (start-index-from state i 0 1))
+
+(defn end-index [state :document i :i64] :i64
+  (span-end (start-index state i) (string-byte-length (block-text state i))))
+
+(defn body-end [state :document] :i64
+  (let [n (block-count state)]
+    (if (= n 0) 1 (end-index state (- n 1)))))
+
+;; --- view -----------------------------------------------------------------
+
+(defn kind-label [kind :string] :string
+  (cond
+    (string=? kind "h1") "見出し1"
+    (string=? kind "h2") "見出し2"
+    (string=? kind "li") "箇条書き"
+    :else "本文"))
+
+(defn kind-code [kind :string] :string
+  (cond
+    (string=? kind "h1") "k1"
+    (string=? kind "h2") "k2"
+    (string=? kind "li") "kl"
+    :else "kp"))
+
+(defn kind-button [kind :string current :string k :string] :document
+  (button (string-concat (kind-code kind) k)
+          (if (string=? kind current) "kind on" "kind")
+          (kind-label kind)))
+
+(defn index-label [state :document i :i64] :string
+  (string-concat "["
+                 (string-concat (string-from-i64 (start-index state i))
+                                (string-concat "–"
+                                               (string-concat (string-from-i64 (end-index state i)) "]")))))
+
+(defn edit-row [state :document i :i64] :document
+  (let [k (key-at i)
+        kind (block-kind state i)]
+    (el "div"
+        (document-map :class (document-string (string-concat "block " (kind-code kind))))
+        (document-vector
+         (kind-button "h1" kind k)
+         (kind-button "h2" kind k)
+         (kind-button "p" kind k)
+         (kind-button "li" kind k)
+         (leaf "input"
+               (document-map :data-k (document-string (string-concat "b" k))
+                             :type (document-string "text")
+                             :class (document-string "text")
+                             :value (document-string (block-text state i)))
+               "")
+         (leaf "span" (document-map :class (document-string "index")) (index-label state i))
+         (button (string-concat "up" k) "move" "↑")
+         (button (string-concat "dn" k) "move" "↓")
+         (button (string-concat "rm" k) "remove" "削除")))))
+
+(defn preview-node [state :document i :i64] :document
+  (let [kind (block-kind state i)
+        text (block-text state i)]
+    (cond
+      (string=? kind "h1") (leaf "h1" (document-map) text)
+      (string=? kind "h2") (leaf "h2" (document-map) text)
+      (string=? kind "li") (el "ul" (document-map) (document-vector (leaf "li" (document-map) text)))
+      :else (leaf "p" (document-map) text))))
+
+(defn rows-from [state :document i :i64 n :i64 preview :bool acc :document] :document
+  (if (>= i n)
+    acc
+    (rows-from state (+ i 1) n preview
+               (document-vector-conj acc (if preview
+                                           (preview-node state i)
+                                           (edit-row state i))))))
+
+(defn preview? [state :document] :bool
+  (string=? (dstr (dget state :mode)) "preview"))
+
+(defn view [state :document] :document
+  (let [preview (preview? state)
+        n (block-count state)]
+    (el "div"
+        (document-map :class (document-string "moji"))
+        (document-vector
+         (el "header"
+             (document-map :class (document-string "bar"))
+             (document-vector
+              (leaf "input"
+                    (document-map :data-k (document-string "title")
+                                  :type (document-string "text")
+                                  :class (document-string "title")
+                                  :value (document-string (dstr (dget state :title))))
+                    "")
+              (button "mode" "mode" (if preview "編集" "プレビュー"))))
+         (el "div"
+             (document-map :class (document-string "tools"))
+             (document-vector
+              (button "add-h1" "add" "+ 見出し1")
+              (button "add-h2" "add" "+ 見出し2")
+              (button "add-p" "add" "+ 本文")
+              (button "add-li" "add" "+ 箇条書き")))
+         (el "main"
+             (document-map :class (document-string (if preview "page preview" "page edit")))
+             (rows-from state 0 n preview (document-vector)))
+         (leaf "footer"
+               (document-map :class (document-string "stats"))
+               (string-concat (string-from-i64 n)
+                              (string-concat " ブロック · 本文 index 1–"
+                                             (string-from-i64 (body-end state)))))))))
+
+;; --- transitions ----------------------------------------------------------
+
+(defn set-blocks [state :document v :document] :document
+  (document-assoc state :blocks v))
+
+(defn add-block [state :document kind :string] :document
+  (if (>= (block-count state) 32)
+    state
+    (set-blocks state (document-vector-conj (blocks state) (block kind "")))))
+
+(defn set-text [state :document i :i64 text :string] :document
+  (if (< i 0)
+    state
+    (set-blocks state (document-vector-assoc
+                       (blocks state) i
+                       (document-assoc (dat (blocks state) i) :text (document-string text))))))
+
+(defn set-kind [state :document i :i64 kind :string] :document
+  (if (< i 0)
+    state
+    (set-blocks state (document-vector-assoc
+                       (blocks state) i
+                       (document-assoc (dat (blocks state) i) :kind (document-string kind))))))
+
+(defn swap [state :document i :i64 j :i64] :document
+  (let [n (block-count state)]
+    (if (or (< i 0) (< j 0) (>= i n) (>= j n))
+      state
+      (let [v (blocks state)
+            a (dat v i)
+            b (dat v j)]
+        (set-blocks state (document-vector-assoc (document-vector-assoc v i b) j a))))))
+
+(defn remove-at [state :document i :i64] :document
+  (if (< i 0)
+    state
+    (set-blocks state (document-vector-remove (blocks state) i))))
+
+(defn toggle-mode [state :document] :document
+  (document-assoc state :mode
+                  (document-string (if (preview? state) "edit" "preview"))))
+
+;; A block action is a two-character op followed by the block key; a shorter
+;; target is not a block action and must not reach `string-substring`.
+(defn on-block [state :document target :string] :document
+  (if (< (string-byte-length target) 3)
+    state
+    (let [op (string-substring target 0 2)
+          i (key-index (string-substring target 2 (string-byte-length target)) (block-count state))]
+      (cond
+        (string=? op "k1") (set-kind state i "h1")
+        (string=? op "k2") (set-kind state i "h2")
+        (string=? op "kp") (set-kind state i "p")
+        (string=? op "kl") (set-kind state i "li")
+        (string=? op "up") (swap state (- i 1) i)
+        (string=? op "dn") (swap state i (+ i 1))
+        (string=? op "rm") (remove-at state i)
+        :else state))))
+
+(defn on-click [state :document target :string] :document
+  (cond
+    (string=? target "mode") (toggle-mode state)
+    (string=? target "add-h1") (add-block state "h1")
+    (string=? target "add-h2") (add-block state "h2")
+    (string=? target "add-p") (add-block state "p")
+    (string=? target "add-li") (add-block state "li")
+    :else (on-block state target)))
+
+(defn on-input [state :document target :string value :string] :document
+  (cond
+    (string=? target "title") (document-assoc state :title (document-string value))
+    (and (> (string-byte-length target) 1) (string=? (string-substring target 0 1) "b"))
+    (set-text state
+              (key-index (string-substring target 1 (string-byte-length target)) (block-count state))
+              value)
+    :else state))
+
+(defn step [state :document target :string kind :string value :string] :document
+  (cond
+    (string=? kind "input") (on-input state target value)
+    (string=? kind "click") (on-click state target)
+    :else state))
+
+;; --- initial state --------------------------------------------------------
+
+(defn init [] :document
+  (document-map
+   :title (document-string "無題の文書")
+   :mode (document-string "edit")
+   :blocks (document-vector
+            (block "h1" "itonami Moji")
+            (block "p" "Write here."))))
+
+;; --- checks (1 = pass) ----------------------------------------------------
+
+(defn click [state :document target :string] :document
+  (step state target "click" ""))
+
+(defn add-n [state :document n :i64] :document
+  (if (<= n 0) state (add-n (click state "add-p") (- n 1))))
+
+(defn test-index-core [] :i64
+  ;; the docs_index rules: endIndex = start + len, next start = end + 1
+  (if (= (+ (span-end 0 5) (next-start 0 5) (span-end 10 3)) 24) 1 0))
+
+(defn test-indices [] :i64
+  ;; "itonami Moji" is 12 bytes: [1–13], then "Write here." (11) starts at 14
+  (let [s (init)]
+    (if (and (= (start-index s 0) 1) (= (end-index s 0) 13)
+             (= (start-index s 1) 14) (= (end-index s 1) 25)
+             (= (body-end s) 25))
+      1 0)))
+
+(defn test-add [] :i64
+  (let [s (click (init) "add-li")]
+    (if (and (= (block-count s) 3) (string=? (block-kind s 2) "li") (string=? (block-text s 2) "")) 1 0)))
+
+(defn test-add-limit [] :i64
+  ;; 32 blocks is the ceiling; a further add leaves the state as it was
+  (if (= (block-count (add-n (init) 40)) 32) 1 0))
+
+(defn test-input [] :i64
+  (let [s (step (init) "b1" "input" "hello")]
+    (if (and (string=? (block-text s 1) "hello") (= (end-index s 1) 19)) 1 0)))
+
+(defn test-title [] :i64
+  (if (string=? (dstr (dget (step (init) "title" "input" "議事録") :title)) "議事録") 1 0))
+
+(defn test-kind [] :i64
+  (let [s (click (init) "k21")]
+    (if (and (string=? (block-kind s 1) "h2") (string=? (block-kind s 0) "h1")) 1 0)))
+
+(defn test-move-down [] :i64
+  (let [s (click (init) "dn0")]
+    (if (and (string=? (block-text s 0) "Write here.") (string=? (block-kind s 1) "h1")) 1 0)))
+
+(defn test-move-up [] :i64
+  ;; moving the first block up, or the last block down, changes nothing
+  (let [s (click (click (init) "up0") "dn1")]
+    (if (and (string=? (block-text s 0) "itonami Moji") (string=? (block-text s 1) "Write here.")) 1 0)))
+
+(defn test-remove [] :i64
+  (let [s (click (init) "rm0")]
+    (if (and (= (block-count s) 1) (string=? (block-text s 0) "Write here.")) 1 0)))
+
+(defn test-mode [] :i64
+  (let [s (click (init) "mode")]
+    (if (and (preview? s) (not (preview? (click s "mode"))))
+      1 0)))
+
+(defn test-unknown [] :i64
+  ;; an unknown or too-short target, an unknown block key and an unobserved
+  ;; event kind all leave the document unchanged
+  (let [s (click (click (click (init) "zz") "x") "rm9")
+        t (step s "add-p" "submit" "")]
+    (if (and (= (block-count t) 2) (string=? (block-text t 0) "itonami Moji")) 1 0)))
+
+(defn test-view [] :i64
+  (let [v (view (init))
+        children (dget v :children)]
+    (if (and (string=? (dstr (dget v :tag)) "div")
+             (= (document-count children) 4)
+             (= (document-count (dget (dat children 2) :children)) 2))
+      1 0)))
+
+(defn main [] :i64
+  (+ (test-index-core) (test-indices) (test-add) (test-add-limit) (test-input)
+     (test-title) (test-kind) (test-move-down) (test-move-up) (test-remove)
+     (test-mode) (test-unknown) (test-view)))
