@@ -1,4 +1,4 @@
-# etzhayyim-project-docs — Google Docs v1 + Microsoft Graph (Word) compatible document API
+# itonami Moji（文字） — 旧 etzhayyim-project-docs — Google Docs v1 + Microsoft Graph (Word) compatible document API
 
 **docs.etzhayyim.com** — a documents API whose external surface is shaped like **both** Google Docs v1
 (structural) and Microsoft Graph Word access (content-based), over **one** canonical store on
