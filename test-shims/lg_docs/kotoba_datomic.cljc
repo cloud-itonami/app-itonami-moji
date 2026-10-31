@@ -2,7 +2,7 @@
   "kotoba datomic XRPC client — clj/bb port of lg_docs/kotoba_datomic.py
   (httpx -> babashka.http-client, per the actor-tree httpx->bb ports #2612).
 
-  Wraps `ai.etzhayyim.apps.kotoba.datomic.{transact,q,pull}` — the canonical
+  Wraps `app.itonami.kotoba.datomic.{transact,q,pull}` — the canonical
   write/read surface for documents (graph `docs-v1`). Endpoint resolution honors
   `KOTOBA_XRPC_URL`/`KOTOBA_URL`; auth = Bearer JWT (`KOTOBA_BEARER`).
 
@@ -103,7 +103,7 @@
    #?(:clj
       (let [body (cond-> {:graph (:graph dm) :tx_edn (edn/encode-tx-data ops)}
                    expected-parent (assoc :expected_parent expected-parent))
-            resp (post-json "/xrpc/ai.etzhayyim.apps.kotoba.datomic.transact" body)]
+            resp (post-json "/xrpc/app.itonami.kotoba.datomic.transact" body)]
         (when (>= (:status resp) 400)
           (throw (ex-info "kotoba transact failed" {:status (:status resp) :body (:body resp)})))
         (json/parse-string (:body resp) true))
@@ -115,7 +115,7 @@
    #?(:clj
       (let [body (cond-> {:graph (:graph dm) :query_edn query-edn}
                    (seq inputs-edn) (assoc :inputs_edn inputs-edn))
-            resp (post-json "/xrpc/ai.etzhayyim.apps.kotoba.datomic.q" body)]
+            resp (post-json "/xrpc/app.itonami.kotoba.datomic.q" body)]
         (when (>= (:status resp) 400)
           (throw (ex-info "kotoba q failed" {:status (:status resp) :body (:body resp)})))
         (let [rows (or (get (json/parse-string (:body resp) true) :rows_edn) [])]
@@ -126,7 +126,7 @@
   [dm entity]
   #?(:clj
      (let [body {:graph (:graph dm) :entity entity}
-           resp (post-json "/xrpc/ai.etzhayyim.apps.kotoba.datomic.pull" body)]
+           resp (post-json "/xrpc/app.itonami.kotoba.datomic.pull" body)]
        (cond
          (= 404 (:status resp)) nil
          (>= (:status resp) 400) (throw (ex-info "kotoba pull failed" {:status (:status resp)}))

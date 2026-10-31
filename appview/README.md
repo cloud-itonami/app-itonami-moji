@@ -4,7 +4,7 @@
 
 ## 対象 App services
 
-- `etzhayyim-docs-ufrumx68`
+- `itonami-moji-ufrumx68`
 - `docs-actor-gen1n2iy`
 - `docs-svc-embed-7hqx05lz`
 - `docs-svc-graphql-kr40xmug`

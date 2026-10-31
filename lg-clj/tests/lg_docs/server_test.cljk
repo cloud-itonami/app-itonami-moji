@@ -14,11 +14,11 @@
 (deftest test-create-then-get-route
   (let [st (store/->fake-doc-store)
         created (server/handle-request st {:method :post
-                                           :path "/xrpc/ai.etzhayyim.apps.docs.documentsCreate"
+                                           :path "/xrpc/app.itonami.moji.documentsCreate"
                                            :headers {} :query {} :body {:title "Routed"}})
         did (get-in created [:body :documentId])
         got (server/handle-request st {:method :get
-                                       :path "/xrpc/ai.etzhayyim.apps.docs.documentsGet"
+                                       :path "/xrpc/app.itonami.moji.documentsGet"
                                        :headers {} :query {:documentId did} :body {}})]
     (is (= 200 (:status created)))
     (is (= true (get-in got [:body :found])))

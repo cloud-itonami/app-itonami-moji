@@ -1,6 +1,6 @@
 {
-  "@context": "https://etzhayyim.com/ns/kotodama/v1",
-  "@id": "did:web:docs.etzhayyim.com",
+  "@context": "https://itonami.app/ns/kotodama/v1",
+  "@id": "did:web:moji.itonami.app",
   "name": "docs-performers",
   "nanoid": "r5ycqp6x",
   "performerType": "system",
@@ -19,12 +19,12 @@
     "isBot": true,
     "agentType": "autonomous",
     "category": "google-workspace",
-    "operator": "etzhayyim.co.jp",
+    "operator": "itonami.app",
     "capabilities": ["bpmn-dispatch", "oauth-redirect"]
   },
   "routes": [
     {
-      "host": "docs.etzhayyim.com",
+      "host": "moji.itonami.app",
       "paths": ["/"],
       "tls": true
     }
@@ -32,9 +32,9 @@
   "triggers": {
     "subscribeRepos": {
       "collections": [
-        "com.etzhayyim.apps.docs.docsEntity",
-        "com.etzhayyim.apps.docs.docsEvent",
-        "com.etzhayyim.apps.docs.docsReport"
+        "app.itonami.moji.docsEntity",
+        "app.itonami.moji.docsEvent",
+        "app.itonami.moji.docsReport"
       ]
     }
   },

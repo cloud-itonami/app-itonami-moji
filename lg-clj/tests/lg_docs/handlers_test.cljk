@@ -109,7 +109,7 @@
                                 (reset! request [url opts])
                                 {:status 200 :body "{\"rows_edn\":[]}"})]
       (is (= [] (kd/q (kd/->client) "[:find ?e]")))
-      (is (= "https://kotoba.test/xrpc/ai.etzhayyim.apps.kotoba.datomic.q"
+      (is (= "https://kotoba.test/xrpc/app.itonami.kotoba.datomic.q"
              (first @request)))
       (is (= "Bearer secret"
              (get-in @request [1 :headers "Authorization"]))))))

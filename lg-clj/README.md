@@ -33,7 +33,7 @@ The Python→clj parity that justified the deletion:
 ## Test
 
 ```bash
-cd 60-apps/etzhayyim-project-docs/lg-clj
+cd lg-clj
 kbb run_tests.cljk      # or: bb test   →  23 tests / 54 assertions, 0 failures
 ```
 

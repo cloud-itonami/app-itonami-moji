@@ -1,6 +1,6 @@
 # itonami Moji（文字） — 旧 etzhayyim-project-docs — Google Docs v1 + Microsoft Graph (Word) compatible document API
 
-**docs.etzhayyim.com** — a documents API whose external surface is shaped like **both** Google Docs v1
+**moji.itonami.app** — a documents API whose external surface is shaped like **both** Google Docs v1
 (structural) and Microsoft Graph Word access (content-based), over **one** canonical store on
 **kotoba datomic** (graph `docs-v1`). Fourth/final build vertical of the workspace-compat program.
 
@@ -13,16 +13,16 @@ Docs ≝ CanonicalDocument[:doc/*, bodyJson] × KotobaDatomic[docs-v1] × {Googl
 ## アーキテクチャ
 
 ```
-Google SDK  → docs.etzhayyim.com/v1/documents/{id}:batchUpdate (structural)  ┐
-MS Graph SDK→ docs.etzhayyim.com/v1.0/me/drive/items/{id}/content (plaintext) ┘
+Google SDK  → moji.itonami.app/v1/documents/{id}:batchUpdate (structural)  ┐
+MS Graph SDK→ moji.itonami.app/v1.0/me/drive/items/{id}/content (plaintext) ┘
   CF Worker docs-compat (50-infra/cloudflare/workers/docs-compat)
-   ├─ /xrpc/ai.etzhayyim.apps.docs.*  → pod (actor-worker passthrough)
+   ├─ /xrpc/app.itonami.moji.*  → pod (actor-worker passthrough)
    └─ provider REST → canonical XRPC → pod → reshape to provider JSON
-  lg-docs pod (60-apps/etzhayyim-project-docs/lg, FastAPI server.py)
+  lg-docs pod (lg, FastAPI server.py)
    → kotoba datomic transact/q/pull on graph docs-v1 (:doc/* namespace)
 ```
 
-## Canonical XRPC methods (ai.etzhayyim.apps.docs.*)
+## Canonical XRPC methods (app.itonami.moji.*)
 
 | method | Google Docs v1 | Microsoft Graph (Word) |
 |---|---|---|
@@ -58,6 +58,6 @@ founder directive "twin の py を削除", 2026-06-28); `lg-clj/` is now the can
 
 ## Test
 ```bash
-cd 60-apps/etzhayyim-project-docs/lg-clj && kbb run_tests.cljk
+cd lg-clj && kbb run_tests.cljk
 cd 50-infra/cloudflare/workers/docs-compat && node --test test/*.test.ts
 ```
